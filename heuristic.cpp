@@ -242,6 +242,7 @@ double Heuristic::solveFast(vector<double>& stat, int timeLimit, float pRep, flo
     alleles.add(timeSet);
 
     GARealGenome genome(alleles, Objective);
+    //genome.initializer(greedyInitializer);
 
     GASteadyStateGA ga(genome);
     //ga.nPopulations(5);
@@ -263,7 +264,7 @@ double Heuristic::solveFast(vector<double>& stat, int timeLimit, float pRep, flo
     ga.statistics().bestPopulation().sort();
 
     // Update problem variables according to the found solution
-    int i, j, m, t;;
+    int i, j, m, t;
     for(unsigned int k = 0; k < ga.statistics().bestPopulation().size() && demand > 0; k++) {
         GARealGenome& g = (GARealGenome&) ga.statistics().bestIndividual(k);
 
@@ -334,7 +335,21 @@ float Heuristic::Objective(GAGenome & g) {
 GABoolean
 Heuristic::GATermination(GAGeneticAlgorithm & ga) {
     execTime = (clock() - execTimeStart) / CLOCKS_PER_SEC;
-    return(execTime < 30) ? gaFalse : gaTrue;
+    return(execTime < 4.8) ? gaFalse : gaTrue;
+}
+
+void Heuristic::greedyInitializer(GAGenome &g) {
+
+    GARealGenome &genome=(GARealGenome &)g;
+    cout << genome << endl;
+    /*int z = 0;
+    for (int i = 0; i < 30; i++)
+        for (int j = 0; j < 30; j++)
+            for (int m = 0; m < 3; m++)
+                for (int t = 0; t < 1; t++, z++)
+                    if(i != j || problem.activities[j] > 0);
+                        // add gene to genoma*/
+
 }
 
 void Heuristic::writeKPI(string path, string instanceName, vector<double> stat){
@@ -482,19 +497,6 @@ void Heuristic::getStatSolution(vector<double>& stat) {
 }
 
 
-void Heuristic::UniformInitializer(GAGenome & c) {
-    GARealGenome &genome=(GARealGenome &)c;
-    int z = 0;
-    for (int i = 0; i < 30; i++)
-        for (int j = 0; j < 30; j++)
-            for (int m = 0; m < 3; m++)
-                for (int t = 0; t < 1; t++, z++)
-                    if(solution[i][j][m][t] > 0) {
-                        solution[i][j][m][t] = 0;
-                        //genome.gene(0, i);
-                    }
-}
-
 void Heuristic::upperHeuristic(int j, int m, int taskNumber, double timeLimit, PartialSolution* sol) {
     int x = 0;
     //i source cell
@@ -509,5 +511,4 @@ void Heuristic::upperHeuristic(int j, int m, int taskNumber, double timeLimit, P
             sol[x] = s;
         }
     }
-
 }

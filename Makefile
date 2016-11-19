@@ -5,7 +5,7 @@ build-tune:
 		g++ Tuner.cpp heuristic.cpp -o tuner -fpermissive -std=c++11 -lga
 
 run:
-		./Coiote_heuristic -i input/Co_30_1_NT_0.txt -o output/summary.csv
+		./Coiote_heuristic -i input/Co_300_20_NT_0.txt -o output/summary.csv
 
 tune:
 		./tuner

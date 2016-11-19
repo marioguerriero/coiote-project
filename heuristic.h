@@ -104,7 +104,7 @@ private:
     static float Objective(GAGenome&);
     static GABoolean GATermination(GAGeneticAlgorithm & ga);
     void upperHeuristic(int j, int m, int taskNumber, double timeLimit, PartialSolution sol[]);
-    static void UniformInitializer(GAGenome & c);
+    static void greedyInitializer(GAGenome &g);
 
 public:
     /**
