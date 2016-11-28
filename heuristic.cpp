@@ -5,6 +5,7 @@
 #include <vector>
 #include <algorithm>
 #include <stdlib.h>
+#include <sys/time.h>
 #include "heuristic.h"
 
 using namespace std;
@@ -119,237 +120,468 @@ Heuristic::Heuristic(string path){
 
 
 double Heuristic::solveFast(vector<double>& stat, int timeLimit, float pRep, float pMut, float pCross) {
+    //initializing variables of the problem
     double objFun = 0;
-    execTimeStart = clock();
+
+    timeval tim;
+    gettimeofday(&tim, NULL);
+    execTimeStart = (tim.tv_sec*1000+tim.tv_usec/1000);
 
     for (int i = 0; i < nCells; i++)
         for (int j = 0; j < nCells; j++)
             for (int m = 0; m < nCustomerTypes; m++)
                 for (int t = 0; t < nTimeSteps; t++)
                     solution[i][j][m][t] = 0;
-/*
-    //calc total number of tasks
-    int numTasks = 0;
-    for(int i = 0; i < nCells; i++) {
-        numTasks += problem.activities[i];
+
+
+    //definition and initialization of my own variables
+    //objfun
+    double *objfuns = new double[4];
+    for(int i = 0; i < 4; i++) {
+        objfuns[i] = 0;
     }
 
-    double singleTaskTime = timeLimit/numTasks;
-
-    //j destination cell
-    // upper level parallel heuristc
-    for (int j = 0; j < nCells; j++) {
-        // number of tasks to be done in the destination cell
-        int demand = problem.activities[j];
-        if(demand == 0) continue;
-
-        PartialSolution **partialSolutions = new PartialSolution*[nCustomerTypes];
-
-        for(int m = 0; m < nCustomerTypes; m++) {
-            // time limit for each thread
-            double timelimit = singleTaskTime * demand;
-
-            //init second array (on m) of **partialSolutions
-            partialSolutions[m] = new PartialSolution[nCells*nTimeSteps];
-            // Begin thread of execution
-            upperHeuristic(j, m, numTasks, timelimit, partialSolutions[m]);
-        }
-
-        PartialSolution *beamSolution = new PartialSolution[nTimeSteps*nCells*nCustomerTypes];
-        int x = 0;
-        for(int i = 0; i < nCustomerTypes; i++) {
-            for (int k = 0; k < nCells; k++, x++) {
-                beamSolution[x] = partialSolutions[i][k];
+    //solution
+    int ****solution1 = new int***[nCells];
+    int ****solution2 = new int***[nCells];
+    int ****solution3 = new int***[nCells];
+    int ****solution4 = new int***[nCells];
+    for (int i = 0; i < this->nCells; i++) {
+        solution1[i] = new int**[nCells];
+        solution2[i] = new int**[nCells];
+        solution3[i] = new int**[nCells];
+        solution4[i] = new int**[nCells];
+        for (int j = 0; j < this->nCells; j++) {
+            solution1[i][j] = new int*[nCustomerTypes];
+            solution2[i][j] = new int*[nCustomerTypes];
+            solution3[i][j] = new int*[nCustomerTypes];
+            solution4[i][j] = new int*[nCustomerTypes];
+            for (int m = 0; m < this->nCustomerTypes; m++) {
+                solution1[i][j][m] = new int[nTimeSteps];
+                solution2[i][j][m] = new int[nTimeSteps];
+                solution3[i][j][m] = new int[nTimeSteps];
+                solution4[i][j][m] = new int[nTimeSteps];
             }
         }
-
-        int reminder = 0;
-        while(demand > 0) {
-            double minCost = 1e10;
-            //will be used to erase nodes where all users come out
-            long minIndex = 0;
-            int i = -1, m = -1, t = -1;
-
-            for(int z = 0; z < x; z++) {
-                double curCost = beamSolution[z].cost;
-
-                //if there are no users in the source cell (i), skip it
-                if (problem.usersCell[beamSolution[z].i][beamSolution[z].m][beamSolution[z].t] == 0) continue;
-                if(reminder != 0 && problem.n[beamSolution[z].m] > reminder) continue;
-                if(j == beamSolution[z].i) continue;
-
-                if(curCost < minCost || (curCost == minCost && beamSolution[z].m > m)) {
-                    minCost = curCost;
-                    minIndex = z;
-                    i = beamSolution[z].i;
-                    m = beamSolution[z].m;
-                    t = beamSolution[z].t;
-                }
-            }
-
-            if(problem.usersCell[i][m][t] * problem.n[m] > demand) {
-                //not moving out all users
-                reminder = demand % problem.n[m];
-                int users_moving = demand/problem.n[m];
-                problem.usersCell[i][m][t] -= users_moving;
-                // move an user inside the destination
-                //problem.usersCell[destination][m][t] += users_moving;
-                solution[i][j][m][t] += users_moving;
-                demand -= users_moving * problem.n[m];
-            } else {
-                //moving out all users
-                // move an user inside the destination
-                //problem.usersCell[destination][m][t] += problem.usersCell[i][m][t];
-                solution[i][j][m][t] += problem.usersCell[i][m][t];
-                // update number of users in source cell
-                demand -= problem.n[m]*problem.usersCell[i][m][t];
-                problem.usersCell[i][m][t] = 0;
-                reminder = 0;
-
-                beamSolution[minIndex].cost = 1000;
-            }
-        }
-    }*/
-
-    //calculate total number of tasks
-    demand = 0;
-    for(int i = 0; i < nCells; i++) {
-        demand += problem.activities[i];
     }
-
-    //initialize alleles
-    GARealAlleleSet destSet;
-    GARealAlleleSet sourceSet;
-    for(int j = 0; j < nCells; j++) {
-        if (problem.activities[j] != 0) {
-            destSet.add(j);
-        }
-        else {
-            sourceSet.add(j);
-        }
-    }
-    GARealAlleleSet userTypeSet;
-    for(int m = 0; m < nCustomerTypes; m++)
-        userTypeSet.add(m);
-    GARealAlleleSet timeSet;
-    for(int t = 0; t < nTimeSteps; t++)
-        timeSet.add(t);
-
-    GARealAlleleSetArray alleles;
-    alleles.add(sourceSet);
-    alleles.add(destSet);
-    alleles.add(userTypeSet);
-    alleles.add(timeSet);
-
-    GARealGenome genome(alleles, Objective);
-    //genome.initializer(greedyInitializer);
-
-    GASteadyStateGA ga(genome);
-    //ga.nPopulations(5);
-    ga.populationSize((unsigned int) 5*demand);
-    //ga.pMigration((unsigned int) 0.1*ga.populationSize());
-    ga.pReplacement(pRep != -1 ? pRep : 0.48);
-    ga.scaling(GANoScaling()); // fitness value must be equal to the objective function
-    ga.selector(GATournamentSelector()); //// pick always the best genome
-    ga.pMutation(pMut != -1 ? pMut : 0.42);
-    ga.pCrossover(pCross != -1 ? : 0.34);
-    ga.nBestGenomes((unsigned int) demand); // find at least "demands" solutions
-
-    ga.terminator(Heuristic::GATermination);
-    ga.evolve();
-
-    //const GAGenome & genome =  ga.statistics().bestPopulation().select();
-    //ga.statistics().nBestGenomes(ga.statistics().bestPopulation().select(), ga.nBestGenomes());
-    //ga.statistics().bestPopulation().order(GAPopulation::SortOrder::HIGH_IS_BEST);
-    ga.statistics().bestPopulation().sort();
-
-    // Update problem variables according to the found solution
-    int i, j, m, t;
-    for(unsigned int k = 0; k < ga.statistics().bestPopulation().size() && demand > 0; k++) {
-        GARealGenome& g = (GARealGenome&) ga.statistics().bestIndividual(k);
-
-        i = (int) g.gene(0);
-        j = (int) g.gene(1);
-        m = (int) g.gene(2);
-        t = (int) g.gene(3);
-
-        //std::cout << problem.costs[i][j][m][t]/problem.n[m] << std::endl;
-
-        if(problem.usersCell[i][m][t] == 0) continue;
-        if(problem.activities[j] == 0) continue;
-        if(i == j) continue;
-
-
-        int possibleTasks = problem.usersCell[i][m][t]*problem.n[m];
-
-
-        if(problem.activities[j] >= possibleTasks) {
-            solution[i][j][m][t] += problem.usersCell[i][m][t];
-            problem.usersCell[i][m][t] = 0;
-            demand -= possibleTasks;
-            problem.activities[j] -= possibleTasks;
-        } else {
-            solution[i][j][m][t] += problem.activities[j] / problem.n[m];
-            problem.usersCell[i][m][t] -= problem.activities[j] / problem.n[m];
-            demand -= (problem.activities[j] / problem.n[m]) * problem.n[m];
-            problem.activities[j] -= (problem.activities[j] / problem.n[m]) * problem.n[m];
-        }
-
-    }
-
     for (int i = 0; i < nCells; i++)
         for (int j = 0; j < nCells; j++)
             for (int m = 0; m < nCustomerTypes; m++)
                 for (int t = 0; t < nTimeSteps; t++) {
-                    if(solution[i][j][m][t] > 0)
-                        objFun += solution[i][j][m][t] * problem.costs[i][j][m][t];
+                    solution1[i][j][m][t] = 0;
+                    solution2[i][j][m][t] = 0;
+                    solution3[i][j][m][t] = 0;
+                    solution4[i][j][m][t] = 0;
                 }
+
+    //usercell
+    int ***usersCell1 = new int**[nCells];
+    int ***usersCell2 = new int**[nCells];
+    int ***usersCell3 = new int**[nCells];
+    int ***usersCell4 = new int**[nCells];
+    for (int i = 0; i < this->nCells; i++) {
+        usersCell1[i] = new int*[nCustomerTypes];
+        usersCell2[i] = new int*[nCustomerTypes];
+        usersCell3[i] = new int*[nCustomerTypes];
+        usersCell4[i] = new int*[nCustomerTypes];
+        for (int m = 0; m < this->nCustomerTypes; m++) {
+            usersCell1[i][m] = new int[nTimeSteps];
+            usersCell2[i][m] = new int[nTimeSteps];
+            usersCell3[i][m] = new int[nTimeSteps];
+            usersCell4[i][m] = new int[nTimeSteps];
+        }
+    }
+    for (int m = 0; m < nCustomerTypes; m++) {
+        for (int t = 0; t < nTimeSteps; t++) {
+            for (int i = 0; i < nCells; i++) {
+                usersCell1[i][m][t] = problem.usersCell[i][m][t];
+                usersCell2[i][m][t] = problem.usersCell[i][m][t];
+                usersCell3[i][m][t] = problem.usersCell[i][m][t];
+                usersCell4[i][m][t] = problem.usersCell[i][m][t];
+            }
+        }
+    }
+
+    //activities
+    int *activities1 = new int[nCells];
+    int *activities2 = new int[nCells];
+    int *activities3 = new int[nCells];
+    int *activities4 = new int[nCells];
+    for (int i = 0; i < nCells; i++) {
+        activities1[i] = problem.activities[i];
+        activities2[i] = problem.activities[i];
+        activities3[i] = problem.activities[i];
+        activities4[i] = problem.activities[i];
+    }
+
+    //demand
+    int demand = 0;
+    for(int i = 0; i < nCells; i++) {
+        demand += problem.activities[i];
+    }
+
+
+
+    thread t1(greedy1, demand, activities1, usersCell1, solution1, objfuns);
+    thread t2(greedy2, demand, activities2, usersCell2, solution2, objfuns);
+    thread t3(greedy3, demand, activities3, usersCell3, solution3, objfuns);
+    thread t4(greedy4, demand, activities4, usersCell4, solution4, objfuns);
+
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+
+
+    double min = objfuns[0];
+    int index = 0;
+    for(int x = 0; x < 4; x++) {
+        if(objfuns[x] < min) {
+            min = objfuns[x];
+            index = x;
+        }
+    }
+
+
+    switch (index) {
+        case 0: {
+            for (int i = 0; i < nCells; i++)
+                for (int j = 0; j < nCells; j++)
+                    for (int m = 0; m < nCustomerTypes; m++)
+                        for (int t = 0; t < nTimeSteps; t++)
+                            if (solution1[i][j][m][t] > 0) {
+                                solution[i][j][m][t] = solution1[i][j][m][t];
+                                problem.usersCell[i][m][t] -= solution[i][j][m][t];
+                                problem.activities[j] = 0;
+                                objFun += solution[i][j][m][t] * problem.costs[i][j][m][t];
+                            }
+        }
+            break;
+        case 1: {
+            for (int i = 0; i < nCells; i++)
+                for (int j = 0; j < nCells; j++)
+                    for (int m = 0; m < nCustomerTypes; m++)
+                        for (int t = 0; t < nTimeSteps; t++)
+                            if (solution2[i][j][m][t] > 0) {
+                                solution[i][j][m][t] = solution2[i][j][m][t];
+                                problem.usersCell[i][m][t] -= solution[i][j][m][t];
+                                problem.activities[j] = 0;
+                                objFun += solution[i][j][m][t] * problem.costs[i][j][m][t];
+                            }
+        }
+            break;
+        case 2: {
+            for (int i = 0; i < nCells; i++)
+                for (int j = 0; j < nCells; j++)
+                    for (int m = 0; m < nCustomerTypes; m++)
+                        for (int t = 0; t < nTimeSteps; t++)
+                            if (solution3[i][j][m][t] > 0) {
+                                solution[i][j][m][t] = solution3[i][j][m][t];
+                                problem.usersCell[i][m][t] -= solution[i][j][m][t];
+                                problem.activities[j] = 0;
+                                objFun += solution[i][j][m][t] * problem.costs[i][j][m][t];
+                            }
+        }
+            break;
+        case 3: {
+            for (int i = 0; i < nCells; i++)
+                for (int j = 0; j < nCells; j++)
+                    for (int m = 0; m < nCustomerTypes; m++)
+                        for (int t = 0; t < nTimeSteps; t++)
+                            if (solution4[i][j][m][t] > 0) {
+                                solution[i][j][m][t] = solution4[i][j][m][t];
+                                problem.usersCell[i][m][t] -= solution[i][j][m][t];
+                                problem.activities[j] = 0;
+                                objFun += solution[i][j][m][t] * problem.costs[i][j][m][t];
+                            }
+        }
+            break;
+    }
+
+    gettimeofday(&tim, NULL);
+    execTime = (tim.tv_sec*1000+tim.tv_usec/1000) - execTimeStart;
 
     stat.push_back(execTime);
     stat.push_back(objFun);
 
-    hasSolution=true;
+    hasSolution = true;
 
     return objFun;
 }
 
-float Heuristic::Objective(GAGenome & g) {
-    GARealGenome& genome = (GARealGenome&) g;
+void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj) {
+    //solution
+    int it2 =-1, jt2 =-1, mt2 =-1, tt2=-1;
+    while(demand1 > 0) {
+        double minCost = 1e10;
+        int it = 0, jt = 0, mt=0, tt=0;
 
-    int i, j, m, t;
-    i = (int) genome.gene(0);
-    j = (int) genome.gene(1);
-    m = (int) genome.gene(2);
-    t = (int) genome.gene(3);
+        for (int j = 0; j < nCells; j++) {
+            if(activities1[j] == 0) continue;
+            for (int i = 0; i < nCells; i++) {
+                if(i == j || activities1[j] == 0) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    //if(activities[j] < problem.n[m]) continue;
+                    for (int t = 0; t < nTimeSteps; t++) {
+                        if(usersCell1[i][m][t]==0) continue;
 
-    int users = problem.usersCell[i][m][t];
-    if(users == 0) return 0;
-    // if there is nothing to do
-    if(problem.activities[j] == 0) return 0;
-    if(i == j) return 0;
-    if(problem.activities[j] < problem.n[m]) return 0;
+                        if(minCost > ((double)problem.costs[i][j][m][t]*activities1[j]/(double)problem.n[m])
+                           || (minCost == ((double)problem.costs[i][j][m][t]*activities1[j]/(double)problem.n[m]) && m > mt)) {
+                            minCost = ((double)problem.costs[i][j][m][t]*activities1[j]/(double)problem.n[m]);
+                            it = i; mt = m; tt = t; jt = j;
+                        }
+                    }
+                }
+            }
+        }
 
-    return ((float)problem.n[m] / ((float)problem.costs[i][j][m][t])); // min cost? -> max 1/cost
+        minCost = 1e10;
+        if(activities1[jt] < problem.n[mt]) {
+            for (int i = 0; i < nCells; i++) {
+                if(i == jt) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    //if(activities[j] < problem.n[m]) continue;
+                    for (int t = 0; t < nTimeSteps; t++) {
+                        if(usersCell1[i][m][t]==0) continue;
+
+                        if(minCost > ((double)problem.costs[i][jt][m][t]*activities1[jt])
+                           || (minCost == problem.costs[i][jt][m][t]*activities1[jt] && m > mt)) {
+                            minCost = ((double)problem.costs[i][jt][m][t]*activities1[jt]);
+                            it = i; mt = m; tt = t;
+                        }
+                    }
+                }
+            }
+        }
+
+        // update solution1s
+        int maxTasks = problem.n[mt] * usersCell1[it][mt][tt];
+
+        if(maxTasks > activities1[jt]) {
+            int movedUsers = activities1[jt] / problem.n[mt];
+            if(it2 == it && mt2 == mt && jt2 == jt && tt2 == tt) {
+                movedUsers = 1;
+                demand1 -= activities1[jt];
+                activities1[jt] = 0;
+            }
+            else {
+                demand1 -= movedUsers * problem.n[mt];
+                activities1[jt] -= movedUsers * problem.n[mt];
+            }
+            solution1[it][jt][mt][tt] += movedUsers;
+            usersCell1[it][mt][tt] -= movedUsers;
+            it2 =it; mt2 =mt; jt2=jt; tt2=tt;
+            //cout << i << " " << j << " " << m << " " << t << endl;
+        }
+        else {
+            solution1[it][jt][mt][tt] += usersCell1[it][mt][tt];
+            activities1[jt] -= maxTasks;
+            usersCell1[it][mt][tt] = 0;
+            demand1 -= maxTasks;
+        }
+    }
+
+    for (int i = 0; i < nCells; i++)
+        for (int j = 0; j < nCells; j++) {
+            if(i == j) continue;
+            if(problem.activities[j] == 0) continue;
+            for (int m = 0; m < nCustomerTypes; m++)
+                for (int t = 0; t < nTimeSteps; t++)
+                    if (solution1[i][j][m][t] > 0) obj[0] += solution1[i][j][m][t] * problem.costs[i][j][m][t];
+        }
 }
 
-GABoolean
-Heuristic::GATermination(GAGeneticAlgorithm & ga) {
-    execTime = (clock() - execTimeStart) / CLOCKS_PER_SEC;
-    return(execTime < 4.8) ? gaFalse : gaTrue;
+void Heuristic::greedy2(int demand2, int *activities2, int ***usersCell2, int ****solution2, double *obj) {
+    //start greedy2
+    int it2 =-1, jt2 =-1, mt2 =-1, tt2=-1;
+    while(demand2 > 0) {
+        double minCost = 1e10;
+        int it = 0, jt = 0, mt=0, tt=0;
+
+
+        for (int j = 0; j < nCells; j++) {
+            if(activities2[j] == 0) continue;
+            for (int i = 0; i < nCells; i++) {
+                if(i == j) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    //if(activities[j] < problem.n[m]) continue;
+                    for (int t = 0; t < nTimeSteps; t++) {
+                        if(usersCell2[i][m][t]==0) continue;
+
+                        if(minCost > ((double)problem.costs[i][j][m][t]/(double)problem.n[m])
+                           || (minCost == ((double)problem.costs[i][j][m][t]/(double)problem.n[m]) && m > mt)) {
+                            minCost = ((double)problem.costs[i][j][m][t]/(double)problem.n[m]);
+                            it = i; mt = m; tt = t; jt = j;
+                        }
+                    }
+                }
+            }
+        }
+
+        minCost = 1e10;
+        if(activities2[jt] < problem.n[mt]) {
+            for (int i = 0; i < nCells; i++) {
+                if(i == jt) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    //if(activities[j] < problem.n[m]) continue;
+                    for (int t = 0; t < nTimeSteps; t++) {
+                        if(usersCell2[i][m][t]==0) continue;
+
+                        if(minCost > ((double)problem.costs[i][jt][m][t])
+                           || (minCost == problem.costs[i][jt][m][t] && m > mt)) {
+                            minCost = ((double)problem.costs[i][jt][m][t]);
+                            it = i; mt = m; tt = t;
+                        }
+                    }
+                }
+            }
+        }
+
+        // update solution1s
+        int maxTasks = problem.n[mt] * usersCell2[it][mt][tt];
+
+        if(maxTasks > activities2[jt]) {
+            int movedUsers = activities2[jt] / problem.n[mt];
+
+            if(it2 == it && mt2 == mt && jt2 == jt && tt2 == tt) {
+                movedUsers = 1;
+                demand2 -= activities2[jt];
+                activities2[jt] = 0;
+            }
+            else {
+                demand2 -= movedUsers * problem.n[mt];
+                activities2[jt] -= movedUsers * problem.n[mt];
+            }
+
+            solution2[it][jt][mt][tt] += movedUsers;
+            usersCell2[it][mt][tt] -= movedUsers;
+            it2 =it; mt2 =mt; jt2=jt; tt2=tt;
+            //cout << it << " " << jt << " " << mt << " " << tt << demand << " " << activities[jt] << endl;
+        }
+        else {
+            solution2[it][jt][mt][tt] += usersCell2[it][mt][tt];
+            activities2[jt] -= maxTasks;
+            usersCell2[it][mt][tt] = 0;
+            demand2 -= maxTasks;
+        }
+    }
+    for (int i = 0; i < nCells; i++)
+        for (int j = 0; j < nCells; j++) {
+            if(i == j) continue;
+            if(problem.activities[j] == 0) continue;
+            for (int m = 0; m < nCustomerTypes; m++)
+                for (int t = 0; t < nTimeSteps; t++)
+                    if (solution2[i][j][m][t] > 0) obj[1] += solution2[i][j][m][t] * problem.costs[i][j][m][t];
+        }
 }
 
-void Heuristic::greedyInitializer(GAGenome &g) {
+void Heuristic::greedy3(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj) {
 
-    GARealGenome &genome=(GARealGenome &)g;
-    cout << genome << endl;
-    /*int z = 0;
-    for (int i = 0; i < 30; i++)
-        for (int j = 0; j < 30; j++)
-            for (int m = 0; m < 3; m++)
-                for (int t = 0; t < 1; t++, z++)
-                    if(i != j || problem.activities[j] > 0);
-                        // add gene to genoma*/
 
+    //start greedy 3
+    while(demand3 > 0) {
+        double minCost = 1e10;
+        int it = 0, jt = 0, mt=0, tt=0;
+
+        for (int j = 0; j < nCells; j++) {
+            if(activities3[j] == 0) continue;
+            for (int i = 0; i < nCells; i++) {
+                if(i == j || activities3[j] == 0) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    if(activities3[j] < problem.n[m]) continue;
+                    for (int t = 0; t < nTimeSteps; t++) {
+                        if(usersCell3[i][m][t]==0) continue;
+
+                        if(minCost > ((double)problem.costs[i][j][m][t]*activities3[j]/(double)problem.n[m])
+                           || (minCost == ((double)problem.costs[i][j][m][t]*activities3[j]/(double)problem.n[m]) && m > mt)) {
+                            minCost = ((double)problem.costs[i][j][m][t]*activities3[j]/(double)problem.n[m]);
+                            it = i; mt = m; tt = t; jt = j;
+                        }
+                    }
+                }
+            }
+        }
+
+        // update solution1s
+        int maxTasks = problem.n[mt] * usersCell3[it][mt][tt];
+
+        if(maxTasks > activities3[jt]) {
+            int movedUsers = activities3[jt] / problem.n[mt];
+            solution3[it][jt][mt][tt] += movedUsers;
+            activities3[jt] -= movedUsers * problem.n[mt];
+            usersCell3[it][mt][tt] -= movedUsers;
+            demand3 -= movedUsers * problem.n[mt];
+            //cout << i << " " << j << " " << m << " " << t << endl;
+        }
+        else {
+            solution3[it][jt][mt][tt] += usersCell3[it][mt][tt];
+            activities3[jt] -= maxTasks;
+            usersCell3[it][mt][tt] = 0;
+            demand3 -= maxTasks;
+        }
+    }
+
+    for (int i = 0; i < nCells; i++)
+        for (int j = 0; j < nCells; j++) {
+            if(i == j) continue;
+            if(problem.activities[j] == 0) continue;
+            for (int m = 0; m < nCustomerTypes; m++)
+                for (int t = 0; t < nTimeSteps; t++)
+                    if (solution3[i][j][m][t] > 0) obj[2] += solution3[i][j][m][t] * problem.costs[i][j][m][t];
+        }
+}
+
+void Heuristic::greedy4(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj) {
+    //start greedy 4
+    while(demand4 > 0) {
+        double minCost = 1e10;
+        int it = 0, jt = 0, mt=0, tt=0;
+
+        for (int j = 0; j < nCells; j++) {
+            if(activities4[j] == 0) continue;
+            for (int i = 0; i < nCells; i++) {
+                if(i == j || activities4[j] == 0) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    if(activities4[j] < problem.n[m]) continue;
+                    for (int t = 0; t < nTimeSteps; t++) {
+                        if(usersCell4[i][m][t]==0) continue;
+
+                        if(minCost > ((double)problem.costs[i][j][m][t]/(double)problem.n[m])
+                           || (minCost == ((double)problem.costs[i][j][m][t]/(double)problem.n[m]) && m > mt)) {
+                            minCost = ((double)problem.costs[i][j][m][t]/(double)problem.n[m]);
+                            it = i; mt = m; tt = t; jt = j;
+                        }
+                    }
+                }
+            }
+        }
+
+        // update solution1s
+        int maxTasks = problem.n[mt] * usersCell4[it][mt][tt];
+
+        if(maxTasks > activities4[jt]) {
+            int movedUsers = activities4[jt] / problem.n[mt];
+            solution4[it][jt][mt][tt] += movedUsers;
+            activities4[jt] -= movedUsers * problem.n[mt];
+            usersCell4[it][mt][tt] -= movedUsers;
+            demand4 -= movedUsers * problem.n[mt];
+            //cout << i << " " << j << " " << m << " " << t << endl;
+        }
+        else {
+            solution4[it][jt][mt][tt] += usersCell4[it][mt][tt];
+            activities4[jt] -= maxTasks;
+            usersCell4[it][mt][tt] = 0;
+            demand4 -= maxTasks;
+        }
+    }
+    for (int i = 0; i < nCells; i++)
+        for (int j = 0; j < nCells; j++) {
+            if(i == j) continue;
+            if(problem.activities[j] == 0) continue;
+            for (int m = 0; m < nCustomerTypes; m++)
+                for (int t = 0; t < nTimeSteps; t++)
+                    if (solution4[i][j][m][t] > 0) obj[3] += solution4[i][j][m][t] * problem.costs[i][j][m][t];
+        }
 }
 
 void Heuristic::writeKPI(string path, string instanceName, vector<double> stat){
@@ -494,21 +726,4 @@ void Heuristic::getStatSolution(vector<double>& stat) {
     for (int m = 0; m < nCustomerTypes; m++)
         stat.push_back(tipi[m]);
 
-}
-
-
-void Heuristic::upperHeuristic(int j, int m, int taskNumber, double timeLimit, PartialSolution* sol) {
-    int x = 0;
-    //i source cell
-    for(int i = 0; i < nCells/* && x < taskNumber*/; i++) {
-        for(int t = 0; t < nTimeSteps/* && x < taskNumber*/; t++, x++) {
-            PartialSolution s;
-            s.cost = problem.costs[i][j][m][t]/problem.n[m];
-            s.i = i;
-            s.m = m;
-            s.t = t;
-
-            sol[x] = s;
-        }
-    }
 }

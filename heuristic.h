@@ -100,11 +100,10 @@ private:
 
     static double execTimeStart;
 
-    // Genetic algorith releated functions
-    static float Objective(GAGenome&);
-    static GABoolean GATermination(GAGeneticAlgorithm & ga);
-    void upperHeuristic(int j, int m, int taskNumber, double timeLimit, PartialSolution sol[]);
-    static void greedyInitializer(GAGenome &g);
+    static void greedy1(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj);
+    static void greedy2(int demand2, int *activities2, int ***usersCell2, int ****solution2, double *obj);
+    static void greedy3(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj);
+    static void greedy4(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj);
 
 public:
     /**

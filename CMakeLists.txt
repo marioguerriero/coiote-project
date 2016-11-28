@@ -9,6 +9,6 @@ set(SOURCE_FILES
     heuristic.h
     main.cpp
     solveAll.sh
-    utils.h heuristic/CoIoTeGenome.cpp heuristic/CoIoTeGenome.h Tuner.cpp)
+    utils.h heuristic/CoIoTeGenome.cpp heuristic/CoIoTeGenome.h)
 
 add_executable(Material_assignment ${SOURCE_FILES})
