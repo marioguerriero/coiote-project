@@ -69,11 +69,6 @@ private:
     static int nCustomerTypes;
 
     /**
-     * Number of cells
-     */
-    static int nCells;
-
-    /**
      * Problem structure for parameters
      */
     static Data problem;
@@ -105,6 +100,8 @@ private:
     static void greedy3(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj);
     static void greedy4(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj);
 
+    static vector<int*> getUsersCombination(int demand);
+
 public:
     /**
      * Default constructor
@@ -118,6 +115,11 @@ public:
      * @return
      */
     Heuristic(string path);
+
+    /**
+     * Number of cells
+     */
+    static int nCells;
 
     /**
      * Function to CHANGE!!! This function only makes a very bad solution for the problem
@@ -153,6 +155,10 @@ public:
      * @return a state of the check (i.e. FEASIBLE if the solution is feasible)
      */
     eFeasibleState isFeasible(string path);
+
+    static float Objective(GAGenome &g);
+
+    static GABoolean GATermination(GAGeneticAlgorithm &ga);
 };
 
 #endif //COIOTE_HEURISTIC_HEURISTIC_H
