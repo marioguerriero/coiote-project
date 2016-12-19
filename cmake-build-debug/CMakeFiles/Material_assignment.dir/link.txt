@@ -1,1 +1,0 @@
-/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/c++    -fpermissive -std=c++11 -lga -g -Wl,-search_paths_first -Wl,-headerpad_max_install_names  CMakeFiles/Material_assignment.dir/heuristic.cpp.o CMakeFiles/Material_assignment.dir/main.cpp.o CMakeFiles/Material_assignment.dir/heuristic/CoIoTeGenome.cpp.o  -o Material_assignment 

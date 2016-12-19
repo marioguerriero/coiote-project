@@ -95,10 +95,13 @@ private:
 
     static double execTimeStart;
 
-    static void greedy1(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj);
-    static void greedy2(int demand2, int *activities2, int ***usersCell2, int ****solution2, double *obj);
-    static void greedy3(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj);
-    static void greedy4(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj);
+    static vector<int *> greedy(vector<vector<int *>> exactCombinations);
+    static void greedy(int ****sol);
+    static void neighboor(int ****sol);
+    static double objective(int ****sol);
+    static double temperature(double input);
+
+    static void copySolution(int ****dest, int ****src);
 
     static vector<int*> getUsersCombination(int demand);
 
@@ -155,10 +158,6 @@ public:
      * @return a state of the check (i.e. FEASIBLE if the solution is feasible)
      */
     eFeasibleState isFeasible(string path);
-
-    static float Objective(GAGenome &g);
-
-    static GABoolean GATermination(GAGeneticAlgorithm &ga);
 };
 
 #endif //COIOTE_HEURISTIC_HEURISTIC_H

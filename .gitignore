@@ -42,3 +42,9 @@ crashlytics-build.properties
 fabric.properties
 
 output/*
+
+input/*
+
+cmake-build-debug/*
+
+Coiote_heuristic
