@@ -128,11 +128,7 @@ int counter = 0;
 
 double Heuristic::solveFast(vector<double>& stat, int timeLimit, float pRep, float pMut, float pCross) {
     //initializing variables of the problem
-    double objFun = 0;
     execTimeStart = clock();
-    timeval time;
-    gettimeofday(&time, NULL);
-    execTimeStart = time.tv_sec;
 
     for (int i = 0; i < nCells; i++)
         for (int j = 0; j < nCells; j++)
@@ -160,30 +156,50 @@ double Heuristic::solveFast(vector<double>& stat, int timeLimit, float pRep, flo
     // Initialization
     int ****currSolution = new int***[nCells];
     int ****bestSolution = new int***[nCells];
-    for (int i = 0; i < this->nCells; i++) {
+    for (int i = 0; i < nCells; i++) {
         currSolution[i] = new int**[nCells];
         bestSolution[i] = new int**[nCells];
-        for (int j = 0; j < this->nCells; j++) {
+        for (int j = 0; j < nCells; j++) {
             currSolution[i][j] = new int*[nCustomerTypes];
             bestSolution[i][j] = new int*[nCustomerTypes];
-            for (int m = 0; m < this->nCustomerTypes; m++) {
+            for (int m = 0; m < nCustomerTypes; m++) {
                 currSolution[i][j][m] = new int[nTimeSteps];
                 bestSolution[i][j][m] = new int[nTimeSteps];
+                for(int t = 0; t < nTimeSteps; t++) {
+                    currSolution[i][j][m][t] = 0;
+                    bestSolution[i][j][m][t] = 0;
+                }
+            }
+        }
+    }
+
+    int ***currUsers = new int**[nCells];
+    int ***bestUsers = new int**[nCells];
+    for (int i = 0; i < nCells; i++) {
+        currUsers[i] = new int*[nCustomerTypes];
+        bestUsers[i] = new int*[nCustomerTypes];
+        for (int m = 0; m < nCustomerTypes; m++) {
+            currUsers[i][m] = new int[nTimeSteps];
+            bestUsers[i][m] = new int[nTimeSteps];
+            for(int t = 0; t < nTimeSteps; t++) {
+                currUsers[i][m][t] = problem.usersCell[i][m][t];
+                bestUsers[i][m][t] = problem.usersCell[i][m][t];
             }
         }
     }
 
     //////// Greedy
     // We use a greedy heuristic to initialize the SA's initial population
-    greedy(currSolution);
+    greedy(currSolution, currUsers);
 
     copySolution(bestSolution, currSolution);
+    copyUsers(bestUsers, currUsers);
 
     int iteration = 0;
 
     // Simulated annealing iterations
-    while((clock() - execTimeStart) / CLOCKS_PER_SEC < 5) { // stopping condition is 5 seconds
-        neighboor(currSolution); // Neighboor generation
+    while((clock() - execTimeStart) / CLOCKS_PER_SEC < 4.8) { // stopping condition is 5 seconds
+        neighboor(currSolution, currUsers); // Neighboor generation
 
         iteration++;
 
@@ -192,15 +208,21 @@ double Heuristic::solveFast(vector<double>& stat, int timeLimit, float pRep, flo
 
         if(currentObj < bestObj) {
             copySolution(bestSolution, currSolution);
+            copyUsers(bestUsers, currUsers);
         }
         else {
             double expP = exp((float) (-(currentObj-bestObj)/temperature(iteration)));
             double rndP = ((double) rand() / (1)) + 1;
             if(rndP < expP) {
                 copySolution(bestSolution, currSolution);
+                copyUsers(bestUsers, currUsers);
             }
         }
     }
+
+    double objFun = objective(bestSolution);
+    copySolution(solution, bestSolution);
+    copyUsers(problem.usersCell, bestUsers);
 
     execTime = (clock() - execTimeStart) / CLOCKS_PER_SEC;
     stat.push_back(execTime);
@@ -209,184 +231,310 @@ double Heuristic::solveFast(vector<double>& stat, int timeLimit, float pRep, flo
     return objFun;
 }
 
-void Heuristic::neighboor(int ****sol) {
+void Heuristic::neighboor(int ****sol, int ***users) {
     /**
-     * Generate a random x and a random (i,j,m,t) and swap x users from
-     * (i,j,m,t) to the first fitting cell eg if sol[i][j][m][t] is equal to 4
-     * then find a j where problem.activities[j] is at least equal to
-     * problem.n[m] * sol[i][j][m][t]. Now move x users (of any type) from
-     * the old (i,j,m,t) to the new one.
+     * Pick two random m values m1 and m2. If they are one the multiple of the other than
+     * pick a random i,j,t and swap a random amount of users with those of another cell
      */
 
-    //// Initialization
+    // Pick two random m values
+    int m1 = (rand() % nCustomerTypes);
+    int m2 = (rand() % nCustomerTypes);
+    while(m2 == m1) m2 = (rand() % nCustomerTypes);
 
-    // Generate (i,j,m,t)
-    int i = (rand() % (int)(nCells + 1));
-    int j = (rand() % (int)(nCells + 1));
-    int m = (rand() % (int)(nCustomerTypes + 1));
-    int t = (rand() % (int)(nTimeSteps + 1));
+    // If they are one the multiple of the other continue
+    if(problem.n[m1] % problem.n[m2] == 0 || problem.n[m2] % problem.n[m1] == 0) {
+        // Generate a random i which will be our source cell
+        int sourceI = (rand() % nCells);
+        int sourceJ = (rand() % nCells);
+        int sourceT = (rand() % nTimeSteps);
 
-    // Generate x
-    int x = (rand() % (int)(problem.usersCell[i][m][t] + 1));
-
-    //// Swap
-
-    // Count the users involved in the swap
-    int usersToMove = sol[i][j][m][t];
-
-    // Find the destination cell
-    int destination = -1;
-    for(int c = 0; c < nCells; c++) {
-        if(c == j) continue;
-        if(problem.activities[c] >= usersToMove * problem.n[m]) {
-            destination = c;
-            break;
+        // Choose source and destination types
+        /** Generally the sourceM is the one with the higher problem.n.
+         * Making this choice is pointless. It's just to simplify the next
+         * steps of the algorithm.
+         */
+        int sourceM, destM;
+        if(problem.n[m1] > problem.n[m2]) {
+            sourceM = m1;
+            destM = m2;
         }
-    }
-    // If not destination could be found return
-    if(destination == -1)
-        return;
+        else {
+            sourceM = m2;
+            destM = m1;
+        }
 
-    // Find the best combinations both for j and for destination
-    vector<int*> combJ = getUsersCombination(problem.activities[j]);
-    vector<int*> combDest = getUsersCombination(problem.activities[destination]);
+        // Find out how many users of type sourceM we want to move
+        if(sol[sourceI][sourceJ][sourceM][sourceT] == 0) return;
+        int usersToMoveSrc = 1 + (rand() % (sol[sourceI][sourceJ][sourceM][sourceT]));
 
+        // Find out how many users of type destM we should move to fit the usersToMove value
+        int usersToMoveDest = (usersToMoveSrc * problem.n[sourceM]) / problem.n[destM];
 
-    // If there are two combinations where c1[m] is equal c2[m], then swap
-    for(int k = 0; k < combJ.size(); k++) {
-        int *currJComb = combJ[k];
-        for(int w = 0; w < combDest.size(); w++) {
-            int *currDestComb = combDest[w];
-            if(currJComb[m] == x && currJComb[m] == currDestComb[m]) {
-
+        // Chose the first destination capable of containing the amount of users we want to move
+        int destI = -1, destJ = -1, destT = -1;
+        bool found = false;
+        for(int i = 0; i < nCells && !found; i++) {
+            for(int j = 0; j < nCells && !found; j++) {
+                for(int t = 0; t < nTimeSteps && !found; t++) {
+                    if(i == sourceI && j == sourceJ && t == sourceT) continue;
+                    if(sol[i][j][destM][t] >= usersToMoveSrc) {
+                        destI = i, destJ = j, destT = t;
+                        found = true;
+                    }
+                }
             }
         }
-    }
+        if(!found) return;
 
-}
+        // Swap!
+        sol[sourceI][sourceJ][sourceM][sourceT] -= usersToMoveSrc;
+        sol[destI][destJ][sourceM][destT] += usersToMoveSrc;
+        sol[destM][destJ][destM][destT] -= usersToMoveSrc;
+        sol[sourceI][sourceJ][destM][sourceT] += usersToMoveSrc;
 
-void Heuristic::greedy(int ****sol) {
-    /**
-     * Find a set of optimum combinations and move users according to it in order
-     * to find a feasible solution. That feasible solution will be our starting point
-     * for the whole algorithm.
-     */
-
-    // Find a set of optimum combinations
-    vector<vector<int*>> optCombs;
-    for(int j = 0; j < nCells; j++) {
-        int demand = problem.activities[j];
-        optCombs.push_back(getUsersCombination(demand));
+        users[sourceI][sourceM][sourceT] -= usersToMoveSrc;
+        users[destI][destM][destT] -= usersToMoveDest;
     }
 }
 
-/*double Heuristic::objective(vector<int *> population) {
-    double obj = 0;
-
-    // Initialize data structures used to analyze the objective value
-
-    // Check how many available users are there
-    int *availableUsers = new int[nCustomerTypes];
-    memset(availableUsers, 0, nCustomerTypes*sizeof(int));
-    for(int i = 0; i < nCells; i++)
-        for(int t = 0; t < nTimeSteps; t++)
-            for(int m = 0; m < nCustomerTypes; m++)
-                availableUsers[m] += problem.usersCell[i][m][t];
-
-    // solutions
-    int ****sol = new int***[nCells];
-    for (int i = 0; i < nCells; i++) {
-        sol[i] = new int **[nCells];
-        for (int j = 0; j < nCells; j++) {
-            sol[i][j] = new int *[nCustomerTypes];
-            for (int m = 0; m < nCustomerTypes; m++) {
-                sol[i][j][m] = new int[nTimeSteps];
-                for (int t = 0; t < nTimeSteps; t++)
-                    sol[i][j][m][t] = 0;
-            }
-        }
-    }
-
-    // usersCell
-    int ***uCell = new int**[nCells];
-    for (int i = 0; i < nCells; i++) {
-        uCell[i] = new int*[nCustomerTypes];
-        for (int m = 0; m < nCustomerTypes; m++) {
-            uCell[i][m] = new int[nTimeSteps];
-            for (int t = 0; t < nTimeSteps; t++)
-                uCell[i][m][t] = problem.usersCell[i][m][t];
-        }
-    }
-
-    // activities
+/**
+ * This method build a feasible optimum solution with a good objective function
+ * value which will be used as a starting point for our simulated annealing algorithm.
+ * @param sol
+ */
+void Heuristic::greedy(int ****sol, int ***users) {
+    // Initialize data structures
+    //activities
     int *act = new int[nCells];
-    for (int i = 0; i < nCells; i++)
-        act[i] = problem.activities[i];
+    for (int i = 0; i < nCells; i++) act[i] = problem.activities[i];
 
-    // Move users for each found combination
-    for(int j = 0; j < population.size(); j++) {
-        int *currComb = population[j];
+    int demand = 0;
+    for(int i = 0; i < nCells; i++) demand += problem.activities[i];
 
-        for (int m = 0; m < nCustomerTypes; m++) {
-            if (currComb[m] == 0) continue;
+    // Perform the greedy heuristic
 
-            double minCost;
-            while (currComb[m] > 0) {
-                if(availableUsers[m] <= 0)
-                    return 0.0;
+    while(demand > 0) {
+        double minCost = 1e10;
+        int it = 0, jt = 0, mt=0, tt=0;
 
-                minCost = 1e10;
-                int it = -1;
-                int tt = -1;
-                for (int i = 0; i < nCells; i++) {
-                    if (i == j) continue;
+        for (int i = 0; i < nCells; i++) {
+            for (int j = 0; j < nCells; j++) {
+                if(i == j || act[j] == 0) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    if(act[j] < problem.n[m]) continue;
                     for (int t = 0; t < nTimeSteps; t++) {
-                        if (uCell[i][m][t] <= 0) continue;
-                        if(availableUsers[m] <= 0) continue;
-                        if (minCost > (problem.costs[i][j][m][t])) {
-                            minCost = (problem.costs[i][j][m][t]);
-                            it = i;
-                            tt = t;
+                        if(users[i][m][t]==0) continue;
+
+                        if(minCost > ((double)problem.costs[i][j][m][t]/(double)problem.n[m])
+                           || (minCost == ((double)problem.costs[i][j][m][t]/(double)problem.n[m]) && m > mt)) {
+                            minCost = ((double)problem.costs[i][j][m][t]/(double)problem.n[m]);
+                            it = i; mt = m; tt = t; jt = j;
                         }
                     }
                 }
-
-                if (uCell[it][m][tt] >= currComb[m]) {
-                    demand -= currComb[m] * problem.n[m];
-                    act[j] -= currComb[m] * problem.n[m];
-                    sol[it][j][m][tt] += currComb[m];
-                    uCell[it][m][tt] -= currComb[m];
-                    availableUsers[m] -= currComb[m];
-                    currComb[m] = 0;
-                } else {
-                    sol[it][j][m][tt] += uCell[it][m][tt];
-                    act[j] -= uCell[it][m][tt] * problem.n[m];
-                    demand -= uCell[it][m][tt] * problem.n[m];
-                    currComb[m] -= uCell[it][m][tt];
-                    availableUsers[m] -= uCell[it][m][tt];
-                    uCell[it][m][tt] = 0;
-                }
-
-                if (act[j] < 0) {
-                    demand += -act[j];
-                    availableUsers[m] += -act[j];
-                    act[j] = 0;
-                }
             }
+        }
+
+        // update solution1s
+        int maxTasks = problem.n[mt] * users[it][mt][tt];
+
+        if(maxTasks > act[jt]) {
+            int movedUsers = act[jt] / problem.n[mt];
+            sol[it][jt][mt][tt] += movedUsers;
+            act[jt] -= movedUsers * problem.n[mt];
+            users[it][mt][tt] -= movedUsers;
+            demand -= movedUsers * problem.n[mt];
+        }
+        else {
+            sol[it][jt][mt][tt] += users[it][mt][tt];
+            act[jt] -= maxTasks;
+            users[it][mt][tt] = 0;
+            demand -= maxTasks;
         }
     }
 
-    // Calculate the objective function value
-    for (int i = 0; i < nCells; i++)
-        for (int j = 0; j < nCells; j++)
-            for (int m = 0; m < nCustomerTypes; m++)
-                for (int t = 0; t < nTimeSteps; t++)
-                    if(sol[i][j][m][t] > 0) obj += sol[i][j][m][t] * problem.costs[i][j][m][t];
+    swapsolutions(sol, users);
+}
 
-    cout << "Objective function: " << obj << endl;
+/**
+ * goal of this method is the improvement of the found solution by swapping solutions (user moves)
+ *
+ * it is divided in two parts:
+ * 1) search of the best swap (the one which improves the more obj func)
+ * 2) apply swap moving as much users as we can
+ *
+ * a particular solutions is represented by a move from i to j of a certain number of m-t users.
+ * in order to find which is the best swap to do we calc i->j + i2->j2 cost (actual solution) and
+ * combined cost i->j2 + i2->j, if the difference between those costs is convenient we do the swap
+ *
+ * one of the main strategies which improves the effectivness of the algorithm is the possibility to
+ * swap solutions with users that still are in their origin cells
+ *
+ * NB: we can swap two same-type users or also two different-type users if there is a relation between them
+ * (for example I can swap one 6 tasks user with two 3 tasks users). this kind of control is done in part (1)
+ *
+ */
+void Heuristic::swapsolutions(int**** solutions, int*** users) {
+    /*
+     * part 1
+     */
+    //we want to maximize the cost difference (maxdiff) between the actual solution (>) and the future one (<)
+    double maxdiff = 0;
+    //loop until max costs difference is > 0
+    do {
+        maxdiff = 0;
+        //temp variables needed below to apply founded solutions
+        int idiff=-1, jdiff=-1, mdiff=-1, tdiff=-1, i2diff=-1, j2diff=-1, t2diff=-1, m2diff=-1;
+        //flag used to keep track of which "type" of swap we have to do (same type users or different ones)
+        bool swaptype; // 0 = same type.             1 = different type
+        //flag used to differenciate "solutions to solutions" and "solutions to users" swap
+        bool userswap; // 0 = s <-> s.              1 = s <-> u
 
-    return obj;
-}*/
+        //start search of the max cost difference
+        for (int j = 0; j < nCells; j++) {
+            if (problem.activities[j] == 0) continue;
+            for (int i = 0; i < nCells; i++) {
+                if (i == j) continue;
+                for (int m = 0; m < nCustomerTypes; m++) {
+                    for (int t = 0; t < nTimeSteps; t++) {
+                        if (solutions[i][j][m][t] == 0) continue;
+
+                        // i -> j cost
+                        int ijcost = (int)problem.costs[i][j][m][t];
+
+                        for(int m2 = 0; m2 < nCustomerTypes; m2++) {
+                            //those are to check if it is possible to swap two different type users
+                            int quotient = problem.n[m2] / problem.n[m];
+                            int residual = problem.n[m2] % problem.n[m];
+                            //if users are of the same type (or a combinable one) residual is 0
+                            if (residual != 0) continue;
+
+                            if (quotient == 1) {
+                                //quotient == 1 -> m2 == m: swap one to one.
+                                //restart search of the max difference
+                                for (int j2 = 0; j2 < nCells; j2++) {
+                                    if (problem.activities[j2] == 0) continue;
+                                    // i -> j2 cost
+                                    int ij2cost = (int)problem.costs[i][j2][m][t];
+                                    for (int i2 = 0; i2 < nCells; i2++) {
+                                        for (int t2 = 0; t2 < nTimeSteps; t2++) {
+                                            //let's differenciate search on solutions and users
+                                            if (solutions[i2][j2][m][t2] != 0) {
+                                                // i2 -> j2 cost
+                                                int i2j2cost = (int) problem.costs[i2][j2][m][t2];
+                                                // i2 -> j cost
+                                                int i2jcost = (int) problem.costs[i2][j][m][t2];
+
+                                                double tempdiff = (ijcost + i2j2cost) - (i2jcost + ij2cost);
+                                                if (maxdiff < tempdiff) {
+                                                    idiff = i; jdiff = j; mdiff = m; tdiff = t;
+                                                    i2diff = i2; t2diff = t2; j2diff = j2;
+                                                    maxdiff = tempdiff;
+                                                    swaptype = false; //flag false = same type swap
+                                                    userswap = false;
+                                                }
+                                            }
+                                            if(users[i2][m][t2] != 0) {
+                                                int i2jcost = (int) problem.costs[i2][j][m][t2];
+                                                double tempdiff = ijcost - i2jcost;
+                                                if (maxdiff < tempdiff) {
+                                                    idiff = i; jdiff = j; mdiff = m; tdiff = t;
+                                                    i2diff = i2; t2diff = t2;
+                                                    maxdiff = tempdiff;
+                                                    swaptype = false; //flag false = same type swap
+                                                    userswap = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } // else I need to check if there are enough users into i cell
+                            else if(solutions[i][j][m][t] >= quotient) {
+                                for (int j2 = 0; j2 < nCells; j2++) {
+                                    if (problem.activities[j2] == 0) continue;
+                                    int ij2cost = (int)problem.costs[i][j2][m][t];
+                                    for (int i2 = 0; i2 < nCells; i2++) {
+                                        for (int t2 = 0; t2 < nTimeSteps; t2++) {
+                                            if (solutions[i2][j2][m2][t2] != 0) {
+                                                int i2j2cost = (int) problem.costs[i2][j2][m2][t2];
+                                                int i2jcost = (int) problem.costs[i2][j][m2][t2];
+
+                                                double tempdiff = (quotient * ijcost + i2j2cost) - (i2jcost + quotient * ij2cost);
+                                                if (maxdiff < tempdiff) {
+                                                    idiff = i; jdiff = j; mdiff = m; tdiff = t;
+                                                    i2diff = i2; t2diff = t2; j2diff = j2; m2diff = m2;
+                                                    maxdiff = tempdiff;
+                                                    swaptype = true; //flag true = different type swap
+                                                    userswap = false;
+                                                }
+                                            }
+                                            if(users[i2][m2][t2] != 0) {
+                                                int i2jcost = (int) problem.costs[i2][j][m2][t2];
+                                                double tempdiff = quotient * ijcost - i2jcost;
+                                                if (maxdiff < tempdiff) {
+                                                    idiff = i; jdiff = j; mdiff = m; tdiff = t;
+                                                    i2diff = i2; t2diff = t2; m2diff = m2;
+                                                    maxdiff = tempdiff;
+                                                    swaptype = true; //flag true = different type swap
+                                                    userswap = true;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        //break if the swap will not improve solution anymore
+        if(maxdiff <= 0) break;
+
+        /*
+         * part 2
+         */
+        //while until there are enough users to move
+        if(swaptype) {
+            if(userswap) {
+                while (solutions[idiff][jdiff][mdiff][tdiff] >= (problem.n[m2diff] / problem.n[mdiff]) &&
+                       users[i2diff][m2diff][t2diff] != 0) {
+                    solutions[idiff][jdiff][mdiff][tdiff] -= problem.n[m2diff] / problem.n[mdiff];
+                    users[idiff][mdiff][tdiff] += problem.n[m2diff] / problem.n[mdiff];
+                    solutions[i2diff][jdiff][m2diff][t2diff]++;
+                    users[i2diff][m2diff][t2diff]--;
+                }
+            } else {
+                while (solutions[idiff][jdiff][mdiff][tdiff] >= (problem.n[m2diff] / problem.n[mdiff]) &&
+                       solutions[i2diff][j2diff][m2diff][t2diff] != 0) {
+                    solutions[idiff][jdiff][mdiff][tdiff] -= problem.n[m2diff] / problem.n[mdiff];
+                    solutions[i2diff][j2diff][m2diff][t2diff]--;
+                    solutions[idiff][j2diff][mdiff][tdiff] += problem.n[m2diff] / problem.n[mdiff];
+                    solutions[i2diff][jdiff][m2diff][t2diff]++;
+                }
+            }
+        } else {
+            if(userswap) {
+                while (solutions[idiff][jdiff][mdiff][tdiff] != 0 && users[i2diff][mdiff][t2diff] != 0) {
+                    solutions[idiff][jdiff][mdiff][tdiff]--;
+                    users[i2diff][mdiff][t2diff]--;
+                    solutions[i2diff][jdiff][mdiff][t2diff]++;
+                    users[idiff][mdiff][tdiff]++;
+                }
+            } else {
+                while (solutions[idiff][jdiff][mdiff][tdiff] != 0 && solutions[i2diff][j2diff][mdiff][t2diff] != 0) {
+                    solutions[idiff][jdiff][mdiff][tdiff]--;
+                    solutions[i2diff][j2diff][mdiff][t2diff]--;
+                    solutions[idiff][j2diff][mdiff][tdiff]++;
+                    solutions[i2diff][jdiff][mdiff][t2diff]++;
+                }
+            }
+        }
+
+    } while(maxdiff > 0);
+
+}
 
 double Heuristic::temperature(double input) {
     return 0.999*input;
@@ -601,6 +749,13 @@ void Heuristic::copySolution(int ****dest, int ****src) {
             for (int m = 0; m < nCustomerTypes; m++)
                 for (int t = 0; t < nTimeSteps; t++)
                     dest[i][j][m][t] = src[i][j][m][t];
+}
+
+void Heuristic::copyUsers(int ***dest, int ***src) {
+    for (int i = 0; i < nCells; i++)
+        for (int m = 0; m < nCustomerTypes; m++)
+            for (int t = 0; t < nTimeSteps; t++)
+                dest[i][m][t] = src[i][m][t];
 }
 
 /*

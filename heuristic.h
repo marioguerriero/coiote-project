@@ -95,15 +95,16 @@ private:
 
     static double execTimeStart;
 
-    static vector<int *> greedy(vector<vector<int *>> exactCombinations);
-    static void greedy(int ****sol);
-    static void neighboor(int ****sol);
+    static void greedy(int ****sol, int ***users);
+    static void swapsolutions(int**** solutions, int ***users);
+    static void neighboor(int ****sol, int ***users);
     static double objective(int ****sol);
     static double temperature(double input);
 
     static void copySolution(int ****dest, int ****src);
+    static void copyUsers(int ***dest, int ***src);
 
-    static vector<int*> getUsersCombination(int demand);
+        static vector<int*> getUsersCombination(int demand);
 
 public:
     /**
