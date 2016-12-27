@@ -17,6 +17,15 @@
 #include <ga/GARealGenome.h>
 #include <ga/std_stream.h>
 
+#define IS_TIME_OVER \
+    double elapsed; \
+    struct timespec finish; \
+    clock_gettime(CLOCK_MONOTONIC, &finish); \
+    elapsed = (finish.tv_sec - start.tv_sec); \
+    elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0; \
+    if(elapsed >= 4.8) \
+        return; \
+
 using namespace std;
 
 struct Data {
@@ -41,15 +50,6 @@ struct Data {
     int*** usersCell;
 };
 
-
-struct PartialSolution {
-    double cost;
-    int i;
-    int m;
-    int t;
-};
-
-
 enum eFeasibleState {
     FEASIBLE,
     NOT_FEASIBLE_DEMAND,
@@ -67,6 +67,11 @@ private:
      * Number of customer types
      */
     static int nCustomerTypes;
+
+    /**
+     * Number of cells
+     */
+    static int nCells;
 
     /**
      * Problem structure for parameters
@@ -92,19 +97,19 @@ private:
      * Execution time
      */
     static double execTime;
+    static struct timespec start;
 
     static double execTimeStart;
 
-    static void greedy(int ****sol, int ***users);
-    static void swapsolutions(int**** solutions, int ***users);
-    static void neighboor(int ****sol, int ***users);
-    static double objective(int ****sol);
-    static double temperature(double input);
+    static void greedy1(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj);
+    static void greedy2(int demand2, int *activities2, int ***usersCell2, int ****solution2, double *obj);
+    static void greedy3(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj);
+    static void greedy4(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj);
 
-    static void copySolution(int ****dest, int ****src);
-    static void copyUsers(int ***dest, int ***src);
+    static vector<int*> getUsersCombination(int demand);
 
-        static vector<int*> getUsersCombination(int demand);
+    static void swapsolutions(int**** solutions, int*** users);
+
 
 public:
     /**
@@ -121,17 +126,12 @@ public:
     Heuristic(string path);
 
     /**
-     * Number of cells
-     */
-    static int nCells;
-
-    /**
      * Function to CHANGE!!! This function only makes a very bad solution for the problem
      * @param stat Array of statistics. In position 0 put the objVal, in position 1 the computational time
      * @param timeLimit Time limit for computation
      * @param verbose
      */
-    double solveFast(vector<double>& stat, int timeLimit = - 1, float pRep = -1, float pMut = -1, float pCross = -1);
+    double solveFast(vector<double>& stat);
 
     /**
      * Puts KPIs in the statistics' array. Call this only if problem has a solution

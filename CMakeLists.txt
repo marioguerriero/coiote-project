@@ -4,7 +4,6 @@ project(Material_assignment)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fpermissive -std=c++11 -lga")
 
 set(SOURCE_FILES
-        input/Co_30_1_NT_0.txt
         heuristic.cpp
     heuristic.h
     main.cpp
