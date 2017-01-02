@@ -130,13 +130,6 @@ double Heuristic::solveFast(vector<double>& stat) {
 
     clock_gettime(CLOCK_MONOTONIC, &start);
 
-    for (int i = 0; i < nCells; i++)
-        for (int j = 0; j < nCells; j++)
-            for (int m = 0; m < nCustomerTypes; m++)
-                for (int t = 0; t < nTimeSteps; t++)
-                    solution[i][j][m][t] = 0;
-
-
     //definition and initialization of my own variables
     //objfun
     double *objfuns = new double[4];
@@ -144,16 +137,35 @@ double Heuristic::solveFast(vector<double>& stat) {
         objfuns[i] = 0;
     }
 
-    //solution
     int ****solution1 = new int***[nCells];
     int ****solution2 = new int***[nCells];
     int ****solution3 = new int***[nCells];
     int ****solution4 = new int***[nCells];
+
+    int ***usersCell1 = new int**[nCells];
+    int ***usersCell2 = new int**[nCells];
+    int ***usersCell3 = new int**[nCells];
+    int ***usersCell4 = new int**[nCells];
+
+    int *activities1 = new int[nCells];
+    int *activities2 = new int[nCells];
+    int *activities3 = new int[nCells];
+    int *activities4 = new int[nCells];
+
     for (int i = 0; i < this->nCells; i++) {
         solution1[i] = new int**[nCells];
         solution2[i] = new int**[nCells];
         solution3[i] = new int**[nCells];
         solution4[i] = new int**[nCells];
+        usersCell1[i] = new int*[nCustomerTypes];
+        usersCell2[i] = new int*[nCustomerTypes];
+        usersCell3[i] = new int*[nCustomerTypes];
+        usersCell4[i] = new int*[nCustomerTypes];
+        activities1[i] = problem.activities[i];
+        activities2[i] = problem.activities[i];
+        activities3[i] = problem.activities[i];
+        activities4[i] = problem.activities[i];
+        demand += problem.activities[i];
         for (int j = 0; j < this->nCells; j++) {
             solution1[i][j] = new int*[nCustomerTypes];
             solution2[i][j] = new int*[nCustomerTypes];
@@ -164,66 +176,24 @@ double Heuristic::solveFast(vector<double>& stat) {
                 solution2[i][j][m] = new int[nTimeSteps];
                 solution3[i][j][m] = new int[nTimeSteps];
                 solution4[i][j][m] = new int[nTimeSteps];
-            }
-        }
-    }
-    for (int i = 0; i < nCells; i++)
-        for (int j = 0; j < nCells; j++)
-            for (int m = 0; m < nCustomerTypes; m++)
-                for (int t = 0; t < nTimeSteps; t++) {
+                usersCell1[i][m] = new int[nTimeSteps];
+                usersCell2[i][m] = new int[nTimeSteps];
+                usersCell3[i][m] = new int[nTimeSteps];
+                usersCell4[i][m] = new int[nTimeSteps];
+                for (int t = 0; t < this->nTimeSteps; t++) {
                     solution1[i][j][m][t] = 0;
                     solution2[i][j][m][t] = 0;
                     solution3[i][j][m][t] = 0;
                     solution4[i][j][m][t] = 0;
+                    solution[i][j][m][t] = 0;
+                    usersCell1[i][m][t] = problem.usersCell[i][m][t];
+                    usersCell2[i][m][t] = problem.usersCell[i][m][t];
+                    usersCell3[i][m][t] = problem.usersCell[i][m][t];
+                    usersCell4[i][m][t] = problem.usersCell[i][m][t];
                 }
-
-    //usercell
-    int ***usersCell1 = new int**[nCells];
-    int ***usersCell2 = new int**[nCells];
-    int ***usersCell3 = new int**[nCells];
-    int ***usersCell4 = new int**[nCells];
-    for (int i = 0; i < this->nCells; i++) {
-        usersCell1[i] = new int*[nCustomerTypes];
-        usersCell2[i] = new int*[nCustomerTypes];
-        usersCell3[i] = new int*[nCustomerTypes];
-        usersCell4[i] = new int*[nCustomerTypes];
-        for (int m = 0; m < this->nCustomerTypes; m++) {
-            usersCell1[i][m] = new int[nTimeSteps];
-            usersCell2[i][m] = new int[nTimeSteps];
-            usersCell3[i][m] = new int[nTimeSteps];
-            usersCell4[i][m] = new int[nTimeSteps];
-        }
-    }
-    for (int m = 0; m < nCustomerTypes; m++) {
-        for (int t = 0; t < nTimeSteps; t++) {
-            for (int i = 0; i < nCells; i++) {
-                usersCell1[i][m][t] = problem.usersCell[i][m][t];
-                usersCell2[i][m][t] = problem.usersCell[i][m][t];
-                usersCell3[i][m][t] = problem.usersCell[i][m][t];
-                usersCell4[i][m][t] = problem.usersCell[i][m][t];
             }
         }
     }
-
-    //activities
-    int *activities1 = new int[nCells];
-    int *activities2 = new int[nCells];
-    int *activities3 = new int[nCells];
-    int *activities4 = new int[nCells];
-    for (int i = 0; i < nCells; i++) {
-        activities1[i] = problem.activities[i];
-        activities2[i] = problem.activities[i];
-        activities3[i] = problem.activities[i];
-        activities4[i] = problem.activities[i];
-    }
-
-    //demand
-    int demand = 0;
-    for(int i = 0; i < nCells; i++) {
-        demand += problem.activities[i];
-    }
-
-
 
     //best in order: 4, 2, 3
     //1 hard
@@ -337,17 +307,45 @@ double Heuristic::solveFast(vector<double>& stat) {
 
 
 /*
+ * goal of this method is to find a feasible solution with the best outcome we can achive.
+ * with the following we can solve almost all the hard instances too.
  *
+ * this is divided into 3 main steps:
+ * 1) managing "sure moves"
+ * 2) find a feasible solution
+ * 3) swap until there is time
+ *
+ * the main idea of the algorithm is to solve the problem by using "combinations":
+ * a combination is a set of users which solve in the most precise way the given (cell) demand.
+ * for example: if we have a cell with 6 tasks to do, and three types of users 3-6-10. we can solve
+ * that problem by using one 6-tasks user or two 3-tasks users.
+ *
+ * step (1)
+ * "sure users" are those which has to be moved. for example certain cells has a reduced number of tasks
+ * and as a result only one possible combination of users; moreover, others have a set of combinations where
+ * a particular type of user necessarily has to be moved.
+ * so in this first step we search for those users and then for the less cost moves
+ *
+ * step (2)
+ * generation of new combinations (since sure moves have modified the initial problem) of all cells
+ * search for the min cost one, looking at the available users
+ * apply the move
+ *
+ * step (2)
+ * swap until 5 sec
  */
 void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj) {
-    //make sure moves
+    /*
+     * step (1)
+     */
+    //tabulist used to skip already done moves
     std::unordered_set<int> tabulist;
+    //external loop: search and perform min cost move
     for(int end = 0; end < nCells; end++) {
-        int *besttype;
-        vector<vector<int>> bestsources;
+        int *besttype; //pointer to the best found
+        vector<vector<int>> bestsources; //will contains the min sources (i, t) found
 
-        besttype = new int[nCustomerTypes];
-
+        //start searching for the min cost solution for the given j
         int minj = -1;
         double minfound = 1e10;
         for(int j = 0; j < nCells; j++) {
@@ -359,7 +357,8 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
             while (combinations.size() == 0)
                 combinations = getUsersCombination(++tempdemand);
 
-            //calc minimum users moved for every m type
+            //calc minimum users moved for every type (m)
+            //second temp array used to memorize current moves, the first one will be broken
             int *type = new int[nCustomerTypes];
             int *typecopy = new int[nCustomerTypes];
             for (int m = 0; m < nCustomerTypes; m++) {
@@ -376,7 +375,7 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
             }
 
             vector<vector<int>> bestsourcestemp;
-            //calc cost of the move which has been found
+            //calc cost of the move for the given j cell
             double movecost = 0;
             for (int m = 0; m < nCustomerTypes; m++) {
                 IS_TIME_OVER
@@ -429,10 +428,10 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
             }
             IS_TIME_OVER
         }
-        if(minj == -1) continue;
+        if(minj == -1) break;
 
+        //here i, j and t of the best solutions (min combination cost) have been found
         tabulist.insert(minj);
-
         //apply minimum move
         for(int m = 0; m < nCustomerTypes; m++) {
             if(besttype[m] == 0) continue;
@@ -469,10 +468,10 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
         IS_TIME_OVER
     }
 
-
-    //start greedy search
+    /*
+     * step (2)
+     */
     while(demand1 > 0) {
-        IS_TIME_OVER
         //will contain the chosen combination
         int *usertypecombin;
         int *availableusers;
@@ -485,20 +484,18 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
                     availableusers[m] += problem.usersCell[i][m][t];
         }
 
-        vector<vector<int>> bestsources;
+        vector<vector<int>> bestsources; //will contains the min sources (i, t) found
 
-        //start search of the best combinations of all cells
+        //start search of the best combinations above all cells
         double min = 1e10;
         int minj;
         for (int j = 0; j < nCells; j++) {
             if(activities1[j] == 0) continue;
-
             int tempdemand = activities1[j];
             //generate all the combination for the given cell j
             vector<int *> combinations = getUsersCombination(tempdemand);
             while (combinations.size() == 0)
                 combinations = getUsersCombination(++tempdemand);
-
 
             //find the best combination in combinations vector
             int *bestcomb;
@@ -561,14 +558,12 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
                     for (int t = 0; t < nTimeSteps; t++)
                         for (int i = 0; i < nCells; i++)
                             usersCell1[i][m][t] = problem.usersCell[i][m][t];
-                //*(5/(clock() - execTimeStart / CLOCKS_PER_SEC))
                 if (!fail && combinationcost < mincombinationcost) {
                     mincombinationcost = combinationcost;
                     bestcomb = currComb;
                     bestsourcestemp2 = bestsourcestemp;
                 }
             }
-
 
             if(mincombinationcost/activities1[j] < min) {
                 minj = j;
@@ -579,6 +574,7 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
             IS_TIME_OVER
         }
 
+        //min cost solution has been found, apply moves
         for(int m = 0; m < nCustomerTypes; m++) {
             if(usertypecombin[m] == 0) continue;
 
@@ -614,8 +610,12 @@ void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int **
                 }
             }
         }
+        IS_TIME_OVER
     }
 
+    /*
+     * step (3)
+     */
     swapsolutions(solution1, usersCell1);
 
 
