@@ -10,13 +10,6 @@
 #include <list>
 #include <map>
 
-#include <ga/ga.h>
-#include <ga/GASimpleGA.h>	// we're going to use the simple GA
-#include <ga/GAGenome.h>
-#include <ga/GAStatistics.h>
-#include <ga/GARealGenome.h>
-#include <ga/std_stream.h>
-
 #define IS_TIME_OVER \
     double elapsed; \
     struct timespec finish; \
