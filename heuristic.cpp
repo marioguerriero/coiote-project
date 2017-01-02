@@ -329,11 +329,16 @@ double Heuristic::solveFast(vector<double>& stat) {
     stat.push_back(elapsed);
     stat.push_back(objFun);
 
-    hasSolution = true;
+    if(objFun != 0)
+        hasSolution = true;
 
     return objFun;
 }
 
+
+/*
+ *
+ */
 void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj) {
     //make sure moves
     std::unordered_set<int> tabulist;
