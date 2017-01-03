@@ -206,7 +206,7 @@ double Heuristic::solveFast(vector<double>& stat) {
     thread t2(greedy2, demand, activities2, usersCell2, solution2, objfuns);
     thread t4(greedy4, demand, activities4, usersCell4, solution4, objfuns);
 #else
-    thread t1(greedy1, demand, activities1, usersCell1, solution1, objfuns);
+    thread t1(combined_search, demand, activities1, usersCell1, solution1, objfuns);
     thread t2(greedy2, demand, activities2, usersCell2, solution2, objfuns);
     thread t3(greedy3, demand, activities3, usersCell3, solution3, objfuns);
     thread t4(greedy4, demand, activities4, usersCell4, solution4, objfuns);
@@ -334,7 +334,7 @@ double Heuristic::solveFast(vector<double>& stat) {
  * step (2)
  * swap until 5 sec
  */
-void Heuristic::greedy1(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj) {
+void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1, int ****solution1, double *obj) {
     /*
      * step (1)
      */
