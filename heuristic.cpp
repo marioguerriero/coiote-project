@@ -338,6 +338,14 @@ void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1
     /*
      * step (1)
      */
+    vector<vector<int *>> combinations;
+    for(int j = 0; j < nCells; j++) {
+        int tempdemand = activities1[j];
+        vector<int *> combs = getUsersCombination(tempdemand);
+        while (tempdemand != 0 && combs.size() == 0)
+            combs = getUsersCombination(++tempdemand);
+        combinations.push_back(combs);
+    }
     //tabulist used to skip already done moves
     std::unordered_set<int> tabulist;
     //external loop: search and perform min cost move
@@ -351,25 +359,19 @@ void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1
         for(int j = 0; j < nCells; j++) {
             if (activities1[j] == 0 || tabulist.count(j)) continue;
 
-            //get combinations for the given cell j
-            int tempdemand = activities1[j];
-            vector<int *> combinations = getUsersCombination(tempdemand);
-            while (combinations.size() == 0)
-                combinations = getUsersCombination(++tempdemand);
-
             //calc minimum users moved for every type (m)
             //second temp array used to memorize current moves, the first one will be broken
             int *type = new int[nCustomerTypes];
             int *typecopy = new int[nCustomerTypes];
             for (int m = 0; m < nCustomerTypes; m++) {
-                type[m] = combinations[0][m];
-                typecopy[m] = combinations[0][m];
+                type[m] = combinations[j][0][m];
+                typecopy[m] = combinations[j][0][m];
             }
-            for (int x = 0; x < combinations.size(); x++) {
+            for (int x = 0; x < combinations[j].size(); x++) {
                 for (int m = 0; m < nCustomerTypes; m++) {
-                    if (type[m] > combinations[x][m]) {
-                        type[m] = combinations[x][m];
-                        typecopy[m] = combinations[x][m];
+                    if (type[m] > combinations[j][x][m]) {
+                        type[m] = combinations[j][x][m];
+                        typecopy[m] = combinations[j][x][m];
                     }
                 }
             }
@@ -441,7 +443,6 @@ void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1
             for(int x = 0; x < its.size(); x++) {
                 it = its[x];
                 tt = its[++x];
-                //cout << "Demand: " << demand1 << " Users:" << usersCell1[it][m][tt] << " Activities: "  << activities1[minindex] << " ijmt: " << it << " " << minindex << " " << m << " " << tt << endl;
                 if(usersCell1[it][m][tt] >= besttype[m]) {
                     demand1 -= besttype[m] * problem.n[m];
                     activities1[minj] -= besttype[m] * problem.n[m];
@@ -471,6 +472,15 @@ void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1
     /*
      * step (2)
      */
+    combinations.clear();
+    for(int j = 0; j < nCells; j++) {
+        int tempdemand = activities1[j];
+        vector<int *> combs = getUsersCombination(tempdemand);
+        while (tempdemand != 0 && combs.size() == 0)
+            combs = getUsersCombination(++tempdemand);
+        combinations.push_back(combs);
+    }
+
     while(demand1 > 0) {
         //will contain the chosen combination
         int *usertypecombin;
@@ -491,19 +501,14 @@ void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1
         int minj;
         for (int j = 0; j < nCells; j++) {
             if(activities1[j] == 0) continue;
-            int tempdemand = activities1[j];
-            //generate all the combination for the given cell j
-            vector<int *> combinations = getUsersCombination(tempdemand);
-            while (combinations.size() == 0)
-                combinations = getUsersCombination(++tempdemand);
 
             //find the best combination in combinations vector
             int *bestcomb;
             double mincombinationcost = 1e10;
             vector<vector<int>> bestsourcestemp2;
-            for (int x = 0; x < combinations.size(); x++) {
+            for (int x = 0; x < combinations[j].size(); x++) {
                 vector<vector<int>> bestsourcestemp;
-                int *currComb = combinations[x];
+                int *currComb = combinations[j][x];
                 double combinationcost = 0;
 
                 //temp array is a copy of currcomb, and is used to keep track of moved users in order to select the proper combination
