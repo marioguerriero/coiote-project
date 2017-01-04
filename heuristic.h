@@ -16,7 +16,7 @@
     clock_gettime(CLOCK_MONOTONIC, &finish); \
     elapsed = (finish.tv_sec - start.tv_sec); \
     elapsed += (finish.tv_nsec - start.tv_nsec) / 1000000000.0; \
-    if(elapsed >= 4.8) \
+    if(elapsed >= 4.9) \
         return; \
 
 using namespace std;

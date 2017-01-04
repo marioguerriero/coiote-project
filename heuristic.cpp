@@ -1,11 +1,6 @@
 #include <iostream>
 #include <random>
 #include <thread>
-#include <math.h>
-#include <vector>
-#include <algorithm>
-#include <stdlib.h>
-#include <sys/time.h>
 #include <unordered_set>
 #include "heuristic.h"
 
@@ -197,10 +192,10 @@ double Heuristic::solveFast(vector<double>& stat) {
 
     //best in order: 3, 1, 2
     //1 hard
-    //4 best greedy
+    //3 best greedy
 #ifdef TWO_THREADS
     thread t1(combined_search, demand, activities1, usersCell1, solution1, objfuns);
-    thread t4(greedy3, demand, activities4, usersCell4, solution4, objfuns);
+    thread t2(greedy1, demand, activities2, usersCell2, solution2, objfuns);
 #elif THREE_THREADS
     thread t1(combined_search, demand, activities1, usersCell1, solution1, objfuns);
     thread t2(greedy1, demand, activities2, usersCell2, solution2, objfuns);
@@ -214,7 +209,7 @@ double Heuristic::solveFast(vector<double>& stat) {
 
 #ifdef TWO_THREADS
     t1.join();
-    t4.join();
+    t2.join();
 #elif THREE_THREADS
     t1.join();
     t2.join();
@@ -635,7 +630,6 @@ void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1
 
 
 void Heuristic::greedy1(int demand2, int *activities2, int ***usersCell2, int ****solution2, double *obj) {
-    //start greedy2
     int it2 =-1, jt2 =-1, mt2 =-1, tt2=-1;
     while(demand2 > 0) {
         IS_TIME_OVER
@@ -716,7 +710,6 @@ void Heuristic::greedy1(int demand2, int *activities2, int ***usersCell2, int **
 }
 
 void Heuristic::greedy2(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj) {
-    //start greedy 3
     while(demand3 > 0) {
         IS_TIME_OVER
         double minCost = 1e10;
@@ -768,7 +761,6 @@ void Heuristic::greedy2(int demand3, int *activities3, int ***usersCell3, int **
 }
 
 void Heuristic::greedy3(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj) {
-    //start greedy 4
     while(demand4 > 0) {
         IS_TIME_OVER
         double minCost = 1e10;
