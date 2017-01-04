@@ -195,21 +195,21 @@ double Heuristic::solveFast(vector<double>& stat) {
         }
     }
 
-    //best in order: 4, 2, 3
+    //best in order: 3, 1, 2
     //1 hard
     //4 best greedy
 #ifdef TWO_THREADS
-    thread t1(greedy1, demand, activities1, usersCell1, solution1, objfuns);
-    thread t4(greedy4, demand, activities4, usersCell4, solution4, objfuns);
+    thread t1(combined_search, demand, activities1, usersCell1, solution1, objfuns);
+    thread t4(greedy3, demand, activities4, usersCell4, solution4, objfuns);
 #elif THREE_THREADS
-    thread t1(greedy1, demand, activities1, usersCell1, solution1, objfuns);
-    thread t2(greedy2, demand, activities2, usersCell2, solution2, objfuns);
-    thread t4(greedy4, demand, activities4, usersCell4, solution4, objfuns);
+    thread t1(combined_search, demand, activities1, usersCell1, solution1, objfuns);
+    thread t2(greedy1, demand, activities2, usersCell2, solution2, objfuns);
+    thread t4(greedy3, demand, activities4, usersCell4, solution4, objfuns);
 #else
     thread t1(combined_search, demand, activities1, usersCell1, solution1, objfuns);
-    thread t2(greedy2, demand, activities2, usersCell2, solution2, objfuns);
-    thread t3(greedy3, demand, activities3, usersCell3, solution3, objfuns);
-    thread t4(greedy4, demand, activities4, usersCell4, solution4, objfuns);
+    thread t2(greedy1, demand, activities2, usersCell2, solution2, objfuns);
+    thread t3(greedy2, demand, activities3, usersCell3, solution3, objfuns);
+    thread t4(greedy3, demand, activities4, usersCell4, solution4, objfuns);
 #endif
 
 #ifdef TWO_THREADS
@@ -634,7 +634,7 @@ void Heuristic::combined_search(int demand1, int *activities1, int ***usersCell1
 }
 
 
-void Heuristic::greedy2(int demand2, int *activities2, int ***usersCell2, int ****solution2, double *obj) {
+void Heuristic::greedy1(int demand2, int *activities2, int ***usersCell2, int ****solution2, double *obj) {
     //start greedy2
     int it2 =-1, jt2 =-1, mt2 =-1, tt2=-1;
     while(demand2 > 0) {
@@ -715,7 +715,7 @@ void Heuristic::greedy2(int demand2, int *activities2, int ***usersCell2, int **
                     if(solution2[i][j][m][t] > 0) obj[1] += solution2[i][j][m][t] * problem.costs[i][j][m][t];
 }
 
-void Heuristic::greedy3(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj) {
+void Heuristic::greedy2(int demand3, int *activities3, int ***usersCell3, int ****solution3, double *obj) {
     //start greedy 3
     while(demand3 > 0) {
         IS_TIME_OVER
@@ -767,7 +767,7 @@ void Heuristic::greedy3(int demand3, int *activities3, int ***usersCell3, int **
                     if(solution3[i][j][m][t] > 0) obj[2] += solution3[i][j][m][t] * problem.costs[i][j][m][t];
 }
 
-void Heuristic::greedy4(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj) {
+void Heuristic::greedy3(int demand4, int *activities4, int ***usersCell4, int ****solution4, double *obj) {
     //start greedy 4
     while(demand4 > 0) {
         IS_TIME_OVER
