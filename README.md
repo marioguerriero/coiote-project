@@ -23,4 +23,6 @@ The user can also check the feasibility of the proposed solution by mean of the 
 make feasibility-check
 ```
 
+All the instances include in the `input' directory could be solved at once by executing the `solveAll.sh` script.
+
 The file `data/results.xlsx` contains a detailed description of the results obtained by resolving the instances given by the problem.
