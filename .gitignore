@@ -50,3 +50,5 @@ solutions/*
 cmake-build-debug/*
 
 Coiote_heuristic
+
+.DS_Store
